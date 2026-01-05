@@ -470,13 +470,24 @@
                         data.images.forEach(image => {
                             const item = document.createElement('div');
                             item.className = 'image-item';
+                            
+                            // Escape HTML to prevent XSS
+                            const escapeHtml = (str) => {
+                                const div = document.createElement('div');
+                                div.textContent = str;
+                                return div.innerHTML;
+                            };
+                            
+                            const safeFilename = escapeHtml(image.filename);
+                            const safeUrl = escapeHtml(image.url);
+                            
                             item.innerHTML = `
-                                <img src="${image.url}" alt="${image.filename}">
+                                <img src="${safeUrl}" alt="${safeFilename}">
                                 <div class="image-actions">
-                                    <button onclick="copyToClipboard('url-${image.filename}')">复制</button>
-                                    <button onclick="deleteImage('${image.filename}')" style="background: #dc3545;">删除</button>
+                                    <button onclick="copyToClipboard('url-${safeFilename}')">复制</button>
+                                    <button onclick="deleteImage('${safeFilename}')" style="background: #dc3545;">删除</button>
                                 </div>
-                                <div id="url-${image.filename}" style="display:none;">${image.url}</div>
+                                <div id="url-${safeFilename}" style="display:none;">${safeUrl}</div>
                             `;
                             grid.appendChild(item);
                         });

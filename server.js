@@ -1,7 +1,9 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
+const crypto = require('crypto');
 const cors = require('cors');
 
 const app = express();
@@ -9,8 +11,8 @@ const PORT = process.env.PORT || 3000;
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+if (!fsSync.existsSync(uploadsDir)) {
+  fsSync.mkdirSync(uploadsDir, { recursive: true });
 }
 
 // Configure multer for file storage
@@ -19,7 +21,7 @@ const storage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(6).toString('hex');
     const ext = path.extname(file.originalname);
     cb(null, file.fieldname + '-' + uniqueSuffix + ext);
   }
@@ -92,11 +94,11 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 // List uploaded images
-app.get('/api/images', (req, res) => {
+app.get('/api/images', async (req, res) => {
   try {
-    const files = fs.readdirSync(uploadsDir);
-    const images = files.map(filename => {
-      const stats = fs.statSync(path.join(uploadsDir, filename));
+    const files = await fs.readdir(uploadsDir);
+    const imagePromises = files.map(async filename => {
+      const stats = await fs.stat(path.join(uploadsDir, filename));
       return {
         filename: filename,
         url: `${req.protocol}://${req.get('host')}/uploads/${filename}`,
@@ -104,6 +106,8 @@ app.get('/api/images', (req, res) => {
         uploadDate: stats.mtime
       };
     });
+    
+    const images = await Promise.all(imagePromises);
     
     res.json({
       success: true,
@@ -120,19 +124,38 @@ app.get('/api/images', (req, res) => {
 });
 
 // Delete image
-app.delete('/api/images/:filename', (req, res) => {
+app.delete('/api/images/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
+    
+    // Validate filename to prevent path traversal attacks
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid filename'
+      });
+    }
+    
     const filePath = path.join(uploadsDir, filename);
     
-    if (!fs.existsSync(filePath)) {
+    // Ensure the resolved path is within the uploads directory
+    if (!filePath.startsWith(uploadsDir)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid filename'
+      });
+    }
+    
+    try {
+      await fs.access(filePath);
+    } catch {
       return res.status(404).json({
         success: false,
         message: 'Image not found'
       });
     }
     
-    fs.unlinkSync(filePath);
+    await fs.unlink(filePath);
     
     res.json({
       success: true,
