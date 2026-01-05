@@ -5,9 +5,27 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const crypto = require('crypto');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Rate limiting middleware
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Limit each IP to 500 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -56,7 +74,7 @@ app.get('/', (req, res) => {
 });
 
 // Upload endpoint (compatible with PicGo)
-app.post('/upload', upload.single('file'), (req, res) => {
+app.post('/upload', uploadLimiter, upload.single('file'), (req, res) => {
   try {
     if (req.fileValidationError) {
       return res.status(400).json({
@@ -94,7 +112,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
 });
 
 // List uploaded images
-app.get('/api/images', async (req, res) => {
+app.get('/api/images', apiLimiter, async (req, res) => {
   try {
     const files = await fs.readdir(uploadsDir);
     const imagePromises = files.map(async filename => {
@@ -124,7 +142,7 @@ app.get('/api/images', async (req, res) => {
 });
 
 // Delete image
-app.delete('/api/images/:filename', async (req, res) => {
+app.delete('/api/images/:filename', apiLimiter, async (req, res) => {
   try {
     const filename = req.params.filename;
     
