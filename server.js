@@ -69,7 +69,7 @@ app.use(express.static('public'));
 app.use('/uploads', express.static(uploadsDir));
 
 // Home page
-app.get('/', (req, res) => {
+app.get('/', apiLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
