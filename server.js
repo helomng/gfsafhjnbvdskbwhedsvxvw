@@ -154,10 +154,12 @@ app.delete('/api/images/:filename', apiLimiter, async (req, res) => {
       });
     }
     
-    const filePath = path.join(uploadsDir, filename);
+    const filePath = path.resolve(uploadsDir, filename);
+    const uploadsRealPath = path.resolve(uploadsDir);
     
-    // Ensure the resolved path is within the uploads directory
-    if (!filePath.startsWith(uploadsDir)) {
+    // Ensure the resolved path is within the uploads directory using relative path check
+    const relativePath = path.relative(uploadsRealPath, filePath);
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid filename'
@@ -166,7 +168,7 @@ app.delete('/api/images/:filename', apiLimiter, async (req, res) => {
     
     try {
       await fs.access(filePath);
-    } catch {
+    } catch (error) {
       return res.status(404).json({
         success: false,
         message: 'Image not found'

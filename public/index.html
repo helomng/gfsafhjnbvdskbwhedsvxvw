@@ -467,28 +467,43 @@
                     if (data.images.length === 0) {
                         grid.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">暂无图片 / No images yet</p>';
                     } else {
-                        data.images.forEach(image => {
+                        data.images.forEach((image, index) => {
                             const item = document.createElement('div');
                             item.className = 'image-item';
                             
-                            // Escape HTML to prevent XSS
-                            const escapeHtml = (str) => {
-                                const div = document.createElement('div');
-                                div.textContent = str;
-                                return div.innerHTML;
-                            };
+                            // Create elements using DOM methods to prevent XSS
+                            const img = document.createElement('img');
+                            img.src = image.url;
+                            img.alt = image.filename;
                             
-                            const safeFilename = escapeHtml(image.filename);
-                            const safeUrl = escapeHtml(image.url);
+                            const actions = document.createElement('div');
+                            actions.className = 'image-actions';
                             
-                            item.innerHTML = `
-                                <img src="${safeUrl}" alt="${safeFilename}">
-                                <div class="image-actions">
-                                    <button onclick="copyToClipboard('url-${safeFilename}')">复制</button>
-                                    <button onclick="deleteImage('${safeFilename}')" style="background: #dc3545;">删除</button>
-                                </div>
-                                <div id="url-${safeFilename}" style="display:none;">${safeUrl}</div>
-                            `;
+                            const copyBtn = document.createElement('button');
+                            copyBtn.textContent = '复制';
+                            copyBtn.dataset.url = image.url;
+                            copyBtn.dataset.index = index;
+                            copyBtn.addEventListener('click', function() {
+                                navigator.clipboard.writeText(this.dataset.url).then(() => {
+                                    showMessage('已复制到剪贴板！ / Copied to clipboard!', 'success');
+                                }).catch(() => {
+                                    showMessage('复制失败 / Copy failed', 'error');
+                                });
+                            });
+                            
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.textContent = '删除';
+                            deleteBtn.style.background = '#dc3545';
+                            deleteBtn.dataset.filename = image.filename;
+                            deleteBtn.addEventListener('click', function() {
+                                deleteImage(this.dataset.filename);
+                            });
+                            
+                            actions.appendChild(copyBtn);
+                            actions.appendChild(deleteBtn);
+                            
+                            item.appendChild(img);
+                            item.appendChild(actions);
                             grid.appendChild(item);
                         });
                     }
